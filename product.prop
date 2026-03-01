@@ -1,6 +1,3 @@
-# Animation
-persist.sys.activity_anim_perf_override=true
-
 # FM Radio
 ro.fm.chip=0x6631
 ro.fm.band=1
