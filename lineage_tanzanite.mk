@@ -31,6 +31,7 @@ PRODUCT_BUILD_PROP_OVERRIDES += \
     DeviceProduct=$(PRODUCT_SYSTEM_NAME)
 
 # Flags
+PERF_ANIM_OVERRIDE := true
 TARGET_CUSTOM_UDFPS := true
 WITH_GMS := true
 WITH_BCR := true
