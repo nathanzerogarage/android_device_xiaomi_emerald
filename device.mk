@@ -26,6 +26,7 @@ $(call inherit-product, packages/apps/ViPER4AndroidFX/config.mk)
 $(call inherit-product-if-exists, hardware/dolby/dolby.mk)
 
 # Bootanimation
+TARGET_BOOT_ANIMATION_RES := 1080
 TARGET_SCREEN_HEIGHT := 1080
 TARGET_SCREEN_WIDTH := 2400
 
