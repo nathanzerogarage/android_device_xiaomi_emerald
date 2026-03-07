@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#define LOG_TAG "power.tanzanite"
+
 #include <aidl/android/hardware/power/BnPower.h>
 #include <android-base/file.h>
 #include <android-base/logging.h>
@@ -15,7 +17,6 @@
 #define TOUCH_MAGIC 't'
 #define TOUCH_IOC_SETMODE _IO(TOUCH_MAGIC, SET_CUR_VALUE)
 #define TOUCH_DEV_PATH "/dev/xiaomi-touch"
-#define TOUCH_ID 0
 
 namespace aidl {
 namespace google {
@@ -38,6 +39,7 @@ bool isDeviceSpecificModeSupported(Mode type, bool* _aidl_return) {
 }
 
 bool setDeviceSpecificMode(Mode type, bool enabled) {
+    LOG(DEBUG) << __func__ << " set device mode " << (int) type << ": " << enabled;
     switch (type) {
         case Mode::DOUBLE_TAP_TO_WAKE: {
             int fd = open(TOUCH_DEV_PATH, O_RDWR);
@@ -48,7 +50,7 @@ bool setDeviceSpecificMode(Mode type, bool enabled) {
         }
         case Mode::DISPLAY_INACTIVE: {
             int fd = open(TOUCH_DEV_PATH, O_RDWR);
-            int arg[3] = {TOUCH_ID, TOUCH_FOD_ENABLE, enabled ? 1 : 0};
+            int arg[3] = {TOUCH_FOD_ENABLE, enabled ? 1 : 0};
             ioctl(fd, TOUCH_IOC_SETMODE, &arg);
             close(fd);
             return true;

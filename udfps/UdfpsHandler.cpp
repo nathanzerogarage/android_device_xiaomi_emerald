@@ -96,7 +96,7 @@ class XiaomiTanzaniteUdfpsHandler : public UdfpsHandler {
         mDevice = device;
         disp_fd_ = android::base::unique_fd(open(DISP_FEATURE_PATH, O_RDWR));
         touch_fd_ = android::base::unique_fd(open(TOUCH_DEV_PATH, O_RDWR));
-
+        
         // Thread to listen for fod ui changes
         std::thread([this]() {
             int fd = open(DISP_FEATURE_PATH, O_RDWR);
@@ -139,6 +139,7 @@ class XiaomiTanzaniteUdfpsHandler : public UdfpsHandler {
                 LOG(DEBUG) << "received data: " << std::bitset<8>(value);
 
                 bool localHbmUiReady = value & LOCAL_HBM_UI_READY;
+                LOG(DEBUG) << "localHbmUiReady: " << localHbmUiReady;
 
                 mDevice->extCmd(mDevice, COMMAND_NIT,
                                 localHbmUiReady ? PARAM_NIT_FOD : PARAM_NIT_NONE);
@@ -147,51 +148,49 @@ class XiaomiTanzaniteUdfpsHandler : public UdfpsHandler {
     }
 
     void onFingerDown(uint32_t x, uint32_t y, float /*minor*/, float /*major*/) {
-        LOG(DEBUG) << __func__ << "x: " << x << ", y: " << y;
+        LOG(DEBUG) << __func__ << " x: " << x << ", y: " << y;
         // Track x and y coordinates
         lastPressX = x;
         lastPressY = y;
 
-        // Ensure touchscreen is aware of the press state, ideally this is not needed
+        // Set up HBM and force-enable FOD
         setFingerDown(true);
     }
 
     void onFingerUp() {
         LOG(DEBUG) << __func__;
-        // Ensure touchscreen is aware of the press state, ideally this is not needed
+        // Set up HBM and force-disable FOD
         setFingerDown(false);
     }
 
     void onAcquired(int32_t result, int32_t vendorCode) {
         LOG(DEBUG) << __func__ << " result: " << result << " vendorCode: " << vendorCode;
         if (result != FINGERPRINT_ACQUIRED_VENDOR) {
-            if (static_cast<AcquiredInfo>(result) == AcquiredInfo::GOOD) {
-                // Request to disable HBM already, even if the finger is still pressed
-                disp_local_hbm_req req;
-                req.base.flag = 0;
-                req.base.disp_id = MI_DISP_PRIMARY;
-                req.local_hbm_value = LHBM_TARGET_BRIGHTNESS_OFF_FINGER_UP;
-                ioctl(disp_fd_.get(), MI_DISP_IOCTL_SET_LOCAL_HBM, &req);
-                setFodStatus(FOD_STATUS_OFF);
-            }
+            // Disable FOD unconditionally to avoid stuck HBM
+            setFodMode(false);
+            setHighlight(false);
         } else if (vendorCode == 21 || vendorCode == 23) {
             /*
              * vendorCode = 21 waiting for fingerprint authentication
              * vendorCode = 23 waiting for fingerprint enroll
              */
-            setFodStatus(FOD_STATUS_ON);
+            setFodMode(true);
         } else if (vendorCode == 44) {
             /*
              * vendorCode = 44 fingerprint scan failed
              */
-            setFingerDown(false);
+            setFodMode(false);
+            setHighlight(false);
         }
     }
 
     void cancel() {
         LOG(DEBUG) << __func__;
-        setFodStatus(FOD_STATUS_OFF);
+        setFodMode(false);
+        setHighlight(false);
     }
+
+    ~XiaomiTanzaniteUdfpsHandler() {}
 
   private:
     fingerprint_device_t* mDevice;
@@ -199,24 +198,34 @@ class XiaomiTanzaniteUdfpsHandler : public UdfpsHandler {
     android::base::unique_fd touch_fd_;
     uint32_t lastPressX, lastPressY;
 
-    void setFodStatus(int value) {
-        set(FOD_STATUS_PATH, value);
-        int arg[3] = {Touch_Fod_Enable, value};
+    void setFodMode(bool enabled) {
+        LOG(DEBUG) << __func__ << " enabled: " << enabled;
+
+        int value = enabled ? 1 : 0;
+        int arg[3] = { Touch_Fod_Enable, value};
         ioctl(touch_fd_, TOUCH_IOC_SETMODE, &arg);
     }
 
-    void setFingerDown(bool pressed) {
-        // xiaomi-touch
-        int arg[3] = {Touch_Fod_Enable, pressed ? 1 : 0};
-        ioctl(touch_fd_, TOUCH_IOC_SETMODE, &arg);
+    void setFodState(bool pressed) {
+        int value = pressed ? 1 : 0;
+        set(FOD_STATUS_PATH, value);
+    }
 
-        // Request HBM
+    void setHighlight(bool enabled) {
         disp_local_hbm_req req;
         req.base.flag = 0;
         req.base.disp_id = MI_DISP_PRIMARY;
-        req.local_hbm_value = pressed ? LHBM_TARGET_BRIGHTNESS_WHITE_1000NIT
+        req.local_hbm_value = enabled ? LHBM_TARGET_BRIGHTNESS_WHITE_1000NIT
                                       : LHBM_TARGET_BRIGHTNESS_OFF_FINGER_UP;
         ioctl(disp_fd_.get(), MI_DISP_IOCTL_SET_LOCAL_HBM, &req);
+    }
+
+    void setFingerDown(bool pressed) {
+        LOG(DEBUG) << __func__ << " pressed: " << pressed;
+
+        setFodMode(pressed);
+        setFodState(pressed);
+        setHighlight(pressed);
 
         // Notify HAL of both press and release events
         mDevice->extCmd(mDevice, COMMAND_FOD_PRESS_STATUS,
