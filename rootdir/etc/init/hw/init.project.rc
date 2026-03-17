@@ -8,7 +8,7 @@ on init
 on post-fs-data
     chown system system /sys/class/touch/touch_dev/palm_sensor
 
-    #Camera
+    # Camera
     chmod 0660 /dev/MAINAF
     chown system camera /dev/MAINAF
 
@@ -30,7 +30,7 @@ on post-fs-data
     chmod 0660 /dev/BU64745GWZAF
     chown system camera /dev/BU64745GWZAF
 
-    #SMB
+    # SMB
     chown system system /proc/smb/ScreenComm
     chmod 0660 /proc/smb/ScreenComm
 
@@ -58,7 +58,7 @@ on post-fs-data
     chmod 0777 /vendor/etc/camera/com.xiaomi.dcal.wu.golden
     chmod 0777 /data/vendor/camera/golden_rear_dc_cal_wt.bin
 
-    #intsense bokeh use
+    # intsense bokeh use
     mkdir /data/vendor/camera/model 0777 system camera
     mkdir /data/vendor/camera/model/dof_model 0777 system camera
     mkdir /data/vendor/camera/model/rt_model 0777 system camera

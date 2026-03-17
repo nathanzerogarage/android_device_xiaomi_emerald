@@ -1,4 +1,4 @@
-#change partition permission
+# Change partition permission
 # eMMC only
 /dev/block/mmcblk0                               0660    root    system
 /dev/block/mmcblk0boot0                          0660    root    system
@@ -51,6 +51,7 @@
 /dev/gps2scp              0660   gps        gps
 /dev/gps_pwr              0660   gps        gps
 /dev/fw_log_gps           0660   gps        gps
+
 # ANT
 /dev/stpant               0660   system     system
 
@@ -83,15 +84,15 @@
 # teeperf driver
 /dev/teeperf              0666   system     system
 
-#v4l2 device
+# v4l2 device
 /dev/video*      0660 camera system
 /dev/media*      0660 camera system
 /dev/v4l-subdev* 0660 camera system
 
-#v4l2 codec
+# v4l2 codec
 /dev/vcu    0660 camera system
 
-#v4l2 camera
+# v4l2 camera
 /dev/mtk_hcp     0660 camera system
 
 # DRM node
@@ -100,7 +101,7 @@
 # MDDP node
 /dev/mddp                 0660   system     system
 
-# add the read write right of ttyUSB*
+# Add the read write right of ttyUSB*
 /dev/bus/usb/*     	  0660   root       usb
 /dev/ttyUSB0              0660   radio      radio
 /dev/ttyUSB1              0660   radio      radio
@@ -130,6 +131,7 @@
 /dev/irtx                 0660   system     system
 /dev/lirc*                0660   root       system
 /dev/ir-learning          0660   system     system
+
 # SGX device node
 /dev/pvrsrvkm             0666   root       root
 /dev/pvr_sync             0666   root       root
@@ -142,13 +144,13 @@
 /sys/devices/platform/leds-mt65xx/leds/blue   delay_on      0664  system   system
 /sys/devices/platform/leds-mt65xx/leds/blue   delay_off      0664  system   system
 
-#GPIO
+# GPIO
 /dev/mtgpio               0600   radio      root
 
 # Camera
 /dev/camera_eeprom*       0660   system     camera
 
-#FOR VIA MODEM
+# For VIA MODEM
 /dev/ttySDIO*             0660   radio      sdcard_rw
 /dev/ttyRB*               0660   radio      radio
 
@@ -179,27 +181,25 @@
 /dev/dma_heap/mtk_sapu_engine_shm_region            0444   system     system
 /dev/dma_heap/mtk_sapu_engine_shm_region-aligned    0444   system     system
 
-#touch
+# Touch
 /dev/touch                0660   root       system
 /dev/hotknot              0660   root       system
 
-#hang_detect
+# hang_detect
 /dev/RT_Monitor           0660   system     system
 /dev/kick_powerkey        0660   system     system
 
-#MTK In-House TEE
+# MTK In-House TEE
 /dev/ttyACM0              0660   radio      radio
 
-#BSP.AUDIO - 2024.06.17 - modify for bring up UltraSound Sensor start
-#elliptic sensor
+# Elliptic sensor
 /dev/elliptic0            0644   system     system
 /dev/elliptic1            0644   system     system
-#BSP.AUDIO - 2024.06.17 - modify for bring up UltraSound Sensor end
 
-# xiaomi display feature
+# Xiaomi display feature
 subsystem mi_display
     devname uevent_devpath
     dirname /dev/mi_display
 
-# xiaomi display feature
+# Xiaomi display feature
 /dev/mi_display/*         0666   root       graphics
