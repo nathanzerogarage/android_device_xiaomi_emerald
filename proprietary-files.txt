@@ -1,4 +1,4 @@
-# Unpinned blobs from missi-user 15 AP3A.240905.015.A2 OS2.0.213.0.VOGEUXM release-keys
+# Unpinned blobs from missi-user 16 BP2A.250605.031.A3 OS3.0.5.0.WOGMIXM release-keys
 
 # AAL
 vendor/lib64/mt6789/libaal_cust_func.so
@@ -1304,9 +1304,9 @@ vendor/lib64/libwvkeybox.so
 
 # Fingerprint
 vendor/app/JVFactoryTest_O7/JVFactoryTest_O7.apk
-vendor/app/goodix_sz_miui/goodix_sz_miui.apk
-vendor/lib64/hw/fingerprint.goodix_fod.so:vendor/lib64/hw/fingerprint.goodix_fod.default.so;FIX_SONAME
-vendor/lib64/hw/fingerprint.jiiov.so:vendor/lib64/hw/fingerprint.jiiov.default.so;FIX_SONAME
+vendor/app/goodix_sz/goodix_sz.apk
+vendor/odm/lib64/hw/fingerprint.goodix_fod.so:vendor/odm/lib64/hw/fingerprint.goodix_fod.default.so;FIX_SONAME
+vendor/odm/lib64/hw/fingerprint.jiiov.so:vendor/odm/lib64/hw/fingerprint.jiiov.default.so;FIX_SONAME
 vendor/lib64/hw/libgf_hal.so
 vendor/lib64/anc.hal.so
 vendor/lib64/libmifpext.so
