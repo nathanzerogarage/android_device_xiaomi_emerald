@@ -38,6 +38,7 @@ AB_OTA_PARTITIONS := \
     boot \
     vendor_boot \
     system \
+    system_dlkm \
     system_ext \
     vendor \
     vendor_dlkm \
