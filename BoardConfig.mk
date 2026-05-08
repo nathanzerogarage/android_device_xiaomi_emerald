@@ -6,6 +6,7 @@
 
 DEVICE_PATH := device/xiaomi/tanzanite
 KERNEL_PATH := device/xiaomi/tanzanite-kernel
+COMMON_GKI_PATH := device/millennium/common-kernel
 
 # Architecture
 TARGET_ARCH := arm64
@@ -75,7 +76,7 @@ TARGET_NO_KERNEL_OVERRIDE := true
 # Workaround to make lineage's soong generator work
 TARGET_KERNEL_SOURCE := device/xiaomi/tanzanite-kernel/kernel-headers
 
-LOCAL_KERNEL := $(KERNEL_PATH)/Image.gz
+LOCAL_KERNEL := $(COMMON_GKI_PATH)/yuuka/Image.gz
 PRODUCT_COPY_FILES += \
     $(LOCAL_KERNEL):kernel
 
@@ -84,19 +85,19 @@ BOARD_PREBUILT_DTBOIMAGE := $(KERNEL_PATH)/dtbo.img
 BOARD_PREBUILT_DTBIMAGE_DIR := $(KERNEL_PATH)/dtb
 
 # Kernel modules
-BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/modules.load.vendor_ramdisk))
-BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(addprefix $(KERNEL_PATH)/modules_ramdisk/, $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD))
+BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules/modules.load.vendor_ramdisk))
+BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(addprefix $(KERNEL_PATH)/modules/ramdisk/, $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD))
 
 # Also add recovery modules to vendor ramdisk
-BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/modules.load.recovery))
-RECOVERY_MODULES := $(addprefix $(KERNEL_PATH)/modules_ramdisk/, $(BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD))
+BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules/modules.load.recovery))
+RECOVERY_MODULES := $(addprefix $(KERNEL_PATH)/modules/ramdisk/, $(BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD))
 
 # Prevent duplicated entries (to solve duplicated build rules problem)
 BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(sort $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES) $(RECOVERY_MODULES))
 
 # Vendor modules (installed to vendor_dlkm)
-BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/modules.load))
-BOARD_VENDOR_KERNEL_MODULES := $(wildcard $(KERNEL_PATH)/modules_dlkm/*.ko)
+BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(DEVICE_PATH)/modules/modules.load.vendor_dlkm))
+BOARD_VENDOR_KERNEL_MODULES := $(wildcard $(KERNEL_PATH)/modules/dlkm/*.ko)
 
 # Partitions
 BOARD_FLASH_BLOCK_SIZE := 262144 # BOARD_KERNEL_PAGESIZE * 64
