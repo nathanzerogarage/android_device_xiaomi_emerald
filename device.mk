@@ -168,8 +168,8 @@ PRODUCT_PACKAGES += \
 
 # Health
 PRODUCT_PACKAGES += \
-    android.hardware.health-service.example \
-    android.hardware.health-service.example_recovery
+    android.hardware.health-service \
+    android.hardware.health-service.recovery
 
 # Light
 PRODUCT_PACKAGES += \
