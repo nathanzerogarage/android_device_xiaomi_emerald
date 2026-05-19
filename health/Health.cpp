@@ -48,7 +48,7 @@ void Health::updateThread(std::shared_ptr<Health> service) {
     while (service.use_count() > 1) {
         {
             std::unique_lock lk(service->update_cv_mutex_);
-            service->update_cv_.wait(lk);
+            service->update_cv_.wait(lk, [&] { return service->need_update_.load(std::memory_order_relaxed); });
         }
 
         LOG(DEBUG) << __func__ << ": perform update";
@@ -66,6 +66,7 @@ void Health::updateThread(std::shared_ptr<Health> service) {
 	    continue;
         }
         service->OnHealthInfoChanged(health_info);
+	service->need_update_.store(false, std::memory_order_relaxed);
         LOG(DEBUG) << __func__ << ": updated";
     }
 }
@@ -351,6 +352,7 @@ ndk::ScopedAStatus Health::unregisterCallback(
 //   android::hardware::health::V2_1::implementation::Health::update() and
 //   android::hardware::health::V2_1::implementation::BinderHealth::update()
 ndk::ScopedAStatus Health::update() {
+    need_update_.store(true, std::memory_order_relaxed);
     update_cv_.notify_one();
     return ndk::ScopedAStatus::ok();
 }

@@ -120,7 +120,7 @@ class Health : public BnHealth, public HalHealthLoopCallback {
     std::condition_variable update_cv_;
     std::mutex update_cv_mutex_;
 
-    std::atomic<bool> stop_;
+    std::atomic<bool> need_update_;
 };
 
 }  // namespace aidl::android::hardware::health
