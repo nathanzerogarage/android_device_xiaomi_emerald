@@ -43,27 +43,42 @@ void onCallbackUnlinked(void* cookie) {
 }
 }  // namespace
 
-/*
-// If you need to call healthd_board_init, construct the Health instance with
-// the healthd_config after calling healthd_board_init:
-class MyHealth : public Health {
-  protected:
-    MyHealth() : Health(CreateConfig()) {}
-  private:
-    static std::unique_ptr<healthd_config> CreateConfig() {
-      auto config = std::make_unique<healthd_config>();
-      ::android::hardware::health::InitHealthdConfig(config.get());
-      healthd_board_init(config.get());
-      return std::move(config);
+void Health::updateThread(std::shared_ptr<Health> service) {
+    LOG(ERROR) << __func__ << ": started";
+    while (service.use_count() > 1) {
+        {
+            std::unique_lock lk(service->update_cv_mutex_);
+            service->update_cv_.wait(lk);
+        }
+
+        LOG(DEBUG) << __func__ << ": perform update";
+
+        service->swap_battery_monitor_->updateValues();
+
+        {
+            std::lock_guard<decltype(service->data_lock_)> lock(service->data_lock_);
+            service->swap_battery_monitor_.swap(service->battery_monitor_);
+        }
+        HealthInfo health_info;
+        if (auto res = service->getHealthInfo(&health_info); !res.isOk()) {
+            LOG(ERROR) << __func__ << ": cannot call getHealthInfo for update: " << res.getDescription();
+
+	    continue;
+        }
+        service->OnHealthInfoChanged(health_info);
+        LOG(DEBUG) << __func__ << ": updated";
     }
-};
-*/
+}
+
 Health::Health(std::string_view instance_name, std::unique_ptr<struct healthd_config>&& config)
     : instance_name_(instance_name),
       healthd_config_(std::move(config)),
       death_recipient_(AIBinder_DeathRecipient_new(&OnCallbackDiedWrapped)) {
     AIBinder_DeathRecipient_setOnUnlinked(death_recipient_.get(), onCallbackUnlinked);
-    battery_monitor_.init(healthd_config_.get());
+    battery_monitor_ = std::make_unique<::android::BatteryMonitor>();
+    swap_battery_monitor_ = std::make_unique<::android::BatteryMonitor>();
+    battery_monitor_->init(healthd_config_.get());
+    swap_battery_monitor_->init(healthd_config_.get());
 }
 
 Health::~Health() {}
@@ -85,42 +100,48 @@ static inline ndk::ScopedAStatus TranslateStatus(::android::status_t err) {
 //
 
 template <typename T>
-static ndk::ScopedAStatus GetProperty(::android::BatteryMonitor* monitor, int id, T defaultValue,
-                                      T* out) {
+ndk::ScopedAStatus Health::getProperty(int id, T defaultValue, T* out) {
     *out = defaultValue;
     struct ::android::BatteryProperty prop;
-    ::android::status_t err = monitor->getProperty(static_cast<int>(id), &prop);
+    
+    ::android::status_t err;
+
+    {
+        std::lock_guard<decltype(data_lock_)> lock(data_lock_);
+        err = battery_monitor_->getProperty(static_cast<int>(id), &prop);
+    }
+
     if (err == ::android::OK) {
         *out = static_cast<T>(prop.valueInt64);
     } else {
-        LOG(DEBUG) << "getProperty(" << id << ")"
+        LOG(WARNING) << __func__ << "(" << id << ")"
                    << " fails: (" << err << ") " << ::android::statusToString(err);
     }
     return TranslateStatus(err);
 }
 
 ndk::ScopedAStatus Health::getChargeCounterUah(int32_t* out) {
-    return GetProperty<int32_t>(&battery_monitor_, ::android::BATTERY_PROP_CHARGE_COUNTER, 0, out);
+    return getProperty<int32_t>(::android::BATTERY_PROP_CHARGE_COUNTER, 0, out);
 }
 
 ndk::ScopedAStatus Health::getCurrentNowMicroamps(int32_t* out) {
-    return GetProperty<int32_t>(&battery_monitor_, ::android::BATTERY_PROP_CURRENT_NOW, 0, out);
+    return getProperty<int32_t>(::android::BATTERY_PROP_CURRENT_NOW, 0, out);
 }
 
 ndk::ScopedAStatus Health::getCurrentAverageMicroamps(int32_t* out) {
-    return GetProperty<int32_t>(&battery_monitor_, ::android::BATTERY_PROP_CURRENT_AVG, 0, out);
+    return getProperty<int32_t>(::android::BATTERY_PROP_CURRENT_AVG, 0, out);
 }
 
 ndk::ScopedAStatus Health::getCapacity(int32_t* out) {
-    return GetProperty<int32_t>(&battery_monitor_, ::android::BATTERY_PROP_CAPACITY, 0, out);
+    return getProperty<int32_t>(::android::BATTERY_PROP_CAPACITY, 0, out);
 }
 
 ndk::ScopedAStatus Health::getEnergyCounterNwh(int64_t* out) {
-    return GetProperty<int64_t>(&battery_monitor_, ::android::BATTERY_PROP_ENERGY_COUNTER, 0, out);
+    return getProperty<int64_t>(::android::BATTERY_PROP_ENERGY_COUNTER, 0, out);
 }
 
 ndk::ScopedAStatus Health::getChargeStatus(BatteryStatus* out) {
-    return GetProperty(&battery_monitor_, ::android::BATTERY_PROP_BATTERY_STATUS,
+    return getProperty(::android::BATTERY_PROP_BATTERY_STATUS,
                        BatteryStatus::UNKNOWN, out);
 }
 
@@ -130,35 +151,39 @@ ndk::ScopedAStatus Health::setChargingPolicy(BatteryChargingPolicy in_value) {
 }
 
 ndk::ScopedAStatus Health::getChargingPolicy(BatteryChargingPolicy* out) {
-    return GetProperty(&battery_monitor_, ::android::BATTERY_PROP_CHARGING_POLICY,
+    return getProperty(::android::BATTERY_PROP_CHARGING_POLICY,
                        BatteryChargingPolicy::DEFAULT, out);
 }
 
 ndk::ScopedAStatus Health::getBatteryHealthData(BatteryHealthData* out) {
     if (auto res =
-                GetProperty<int64_t>(&battery_monitor_, ::android::BATTERY_PROP_MANUFACTURING_DATE,
+                getProperty<int64_t>(::android::BATTERY_PROP_MANUFACTURING_DATE,
                                      0, &out->batteryManufacturingDateSeconds);
         !res.isOk()) {
         LOG(WARNING) << "Cannot get Manufacturing_date: " << res.getDescription();
     }
-    if (auto res = GetProperty<int64_t>(&battery_monitor_, ::android::BATTERY_PROP_FIRST_USAGE_DATE,
+    if (auto res = getProperty<int64_t>(::android::BATTERY_PROP_FIRST_USAGE_DATE,
                                         0, &out->batteryFirstUsageSeconds);
         !res.isOk()) {
         LOG(WARNING) << "Cannot get First_usage_date: " << res.getDescription();
     }
-    if (auto res = GetProperty<int64_t>(&battery_monitor_, ::android::BATTERY_PROP_STATE_OF_HEALTH,
+    if (auto res = getProperty<int64_t>(::android::BATTERY_PROP_STATE_OF_HEALTH,
                                         0, &out->batteryStateOfHealth);
         !res.isOk()) {
         LOG(WARNING) << "Cannot get Battery_state_of_health: " << res.getDescription();
     }
-    if (auto res = battery_monitor_.getSerialNumber(&out->batterySerialNumber);
-        res != ::android::OK) {
-        LOG(WARNING) << "Cannot get Battery_serial_number: "
-                     << TranslateStatus(res).getDescription();
+
+    {
+        std::lock_guard<decltype(data_lock_)> lock(data_lock_);
+        if (auto res = battery_monitor_->getSerialNumber(&out->batterySerialNumber);
+            res != ::android::OK) {
+            LOG(WARNING) << "Cannot get Battery_serial_number: "
+                         << TranslateStatus(res).getDescription();
+        }
     }
 
     int64_t part_status = static_cast<int64_t>(BatteryPartStatus::UNSUPPORTED);
-    if (auto res = GetProperty<int64_t>(&battery_monitor_, ::android::BATTERY_PROP_PART_STATUS,
+    if (auto res = getProperty<int64_t>(::android::BATTERY_PROP_PART_STATUS,
                                         static_cast<int64_t>(BatteryPartStatus::UNSUPPORTED),
                                         &part_status);
         !res.isOk()) {
@@ -188,9 +213,10 @@ ndk::ScopedAStatus Health::getHingeInfo(std::vector<HingeInfo>*) {
 }
 
 ndk::ScopedAStatus Health::getHealthInfo(HealthInfo* out) {
-    battery_monitor_.updateValues();
-
-    *out = battery_monitor_.getHealthInfo();
+    {
+        std::lock_guard<decltype(data_lock_)> lock(data_lock_);
+        *out = battery_monitor_->getHealthInfo();
+    }
 
     // Fill in storage infos; these aren't retrieved by BatteryMonitor.
     if (auto res = getStorageInfo(&out->storageInfos); !res.isOk()) {
@@ -216,14 +242,14 @@ ndk::ScopedAStatus Health::getHealthInfo(HealthInfo* out) {
         out->diskStats = {};
     }
 
-    // A subclass may want to update health info struct before returning it.
-    UpdateHealthInfo(out);
-
     return ndk::ScopedAStatus::ok();
 }
 
 binder_status_t Health::dump(int fd, const char**, uint32_t) {
-    battery_monitor_.dumpState(fd);
+    {
+        std::lock_guard<decltype(data_lock_)> lock(data_lock_);
+        battery_monitor_->dumpState(fd);
+    }
 
     ::android::base::WriteStringToFd("\ngetHealthInfo -> ", fd);
     HealthInfo health_info;
@@ -253,22 +279,6 @@ std::optional<bool> Health::ShouldKeepScreenOn() {
     ::android::BatteryProperties props = {};
     convert(health_info, &props);
     return healthd_config_->screen_on(&props);
-}
-
-//
-// Subclass helpers / overrides
-//
-
-void Health::UpdateHealthInfo(HealthInfo* /* health_info */) {
-    /*
-        // Sample code for a subclass to implement this:
-        // If you need to modify values (e.g. batteryChargeTimeToFullNowSeconds), do it here.
-        health_info->batteryChargeTimeToFullNowSeconds = calculate_charge_time_seconds();
-
-        // If you need to call healthd_board_battery_update, modify its signature
-        // and implementation to operate on HealthInfo directly, then call:
-        healthd_board_battery_update(health_info);
-    */
 }
 
 //
@@ -341,19 +351,7 @@ ndk::ScopedAStatus Health::unregisterCallback(
 //   android::hardware::health::V2_1::implementation::Health::update() and
 //   android::hardware::health::V2_1::implementation::BinderHealth::update()
 ndk::ScopedAStatus Health::update() {
-    HealthInfo health_info;
-    if (auto res = getHealthInfo(&health_info); !res.isOk()) {
-        LOG(DEBUG) << "Cannot call getHealthInfo for update(): " << res.getDescription();
-        // Propagate service specific errors. If there's none, report unknown error.
-        if (res.getServiceSpecificError() != 0 ||
-            res.getExceptionCode() == EX_UNSUPPORTED_OPERATION) {
-            return res;
-        }
-        return ndk::ScopedAStatus::fromServiceSpecificErrorWithMessage(
-                IHealth::STATUS_UNKNOWN, res.getDescription().c_str());
-    }
-    battery_monitor_.logValues();
-    OnHealthInfoChanged(health_info);
+    update_cv_.notify_one();
     return ndk::ScopedAStatus::ok();
 }
 
@@ -380,6 +378,8 @@ void Health::BinderEvent(uint32_t /*epevents*/) {
 
 void Health::OnInit(HalHealthLoop* hal_health_loop, struct healthd_config* config) {
     LOG(INFO) << instance_name_ << " instance initializing with healthd_config...";
+
+    update_thread_ = std::thread(updateThread, ref<Health>());
 
     // Similar to HIDL's android::hardware::health::V2_1::implementation::HalHealthLoop::Init,
     // copy configuration parameters to |config| for HealthLoop (e.g. uevent / wake alarm periods)

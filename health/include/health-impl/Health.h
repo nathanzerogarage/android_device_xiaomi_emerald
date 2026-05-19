@@ -52,7 +52,6 @@ class Health : public BnHealth, public HalHealthLoopCallback {
             const std::shared_ptr<IHealthInfoCallback>& callback) override;
     ndk::ScopedAStatus update() override;
 
-    // A subclass should not override this. Override UpdateHealthInfo instead.
     ndk::ScopedAStatus getHealthInfo(HealthInfo* out) override final;
 
     // A subclass is recommended to override the path in healthd_config in the constructor.
@@ -96,25 +95,32 @@ class Health : public BnHealth, public HalHealthLoopCallback {
     virtual std::optional<bool> ShouldKeepScreenOn();
 
   protected:
-    // A subclass can override this to modify any health info object before
-    // returning to clients. This is similar to healthd_board_battery_update().
-    // By default, it does nothing.
-    // See implementation of Health for code samples.
-    virtual void UpdateHealthInfo(HealthInfo* health_info);
-
   private:
     friend LinkedCallback;  // for exposing death_recipient_
 
     bool unregisterCallbackInternal(std::shared_ptr<IHealthInfoCallback> callback);
+    static void updateThread(std::shared_ptr<Health> data);
+    
+    template<typename T> ndk::ScopedAStatus getProperty(int fd, T defaultVault, T* out);
 
     std::string instance_name_;
-    ::android::BatteryMonitor battery_monitor_;
     std::unique_ptr<struct healthd_config> healthd_config_;
 
     ndk::ScopedAIBinder_DeathRecipient death_recipient_;
     int binder_fd_ = -1;
     std::mutex callbacks_lock_;
     std::map<LinkedCallback*, std::shared_ptr<IHealthInfoCallback>> callbacks_;
+
+    // Access battery_monitor only when data_lock is locked
+    std::mutex data_lock_;
+    std::unique_ptr<::android::BatteryMonitor> battery_monitor_;
+
+    std::thread update_thread_;
+    std::unique_ptr<::android::BatteryMonitor> swap_battery_monitor_;
+    std::condition_variable update_cv_;
+    std::mutex update_cv_mutex_;
+
+    std::atomic<bool> stop_;
 };
 
 }  // namespace aidl::android::hardware::health
