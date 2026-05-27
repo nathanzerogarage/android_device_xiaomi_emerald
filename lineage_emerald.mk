@@ -29,3 +29,7 @@ PRODUCT_BUILD_PROP_OVERRIDES += \
     BuildFingerprint=Redmi/emerald_eea/emerald:15/AP3A.240905.015.A2/OS2.0.211.0.VNFEUXM:user/release-keys \
     DeviceName=$(PRODUCT_SYSTEM_DEVICE) \
     DeviceProduct=$(PRODUCT_SYSTEM_NAME)
+
+# Lunaris Flags
+TARGET_CUSTOM_UDFPS := true
+WITH_GMS := false

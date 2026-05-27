@@ -351,6 +351,8 @@ PRODUCT_PACKAGES += \
     ApertureOverlayEmerald \
     FrameworksResOverlayEmerald \
     SettingsResOverlayEmerald \
+    SettingsResOverlayEmeraldP \
+    SettingsResOverlayEmeraldR \
     SettingsProviderResOverlayEmerald \
     SystemUIOverlayEmerald \
     TetheringResOverlayEmerald \

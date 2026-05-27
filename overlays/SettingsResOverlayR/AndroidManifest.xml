@@ -8,5 +8,5 @@
     package="com.android.settingsres.overlay.emerald">
     <application android:hasCode="false" />
     <overlay android:targetPackage="com.android.settings" android:isStatic="true" android:priority="1"
-    android:requiredSystemPropertyName="ro.boot.rsc" android:requiredSystemPropertyValue="glb" />
+    android:requiredSystemPropertyName="ro.boot.rsc" android:requiredSystemPropertyValue="glb_r" />
 </manifest>
